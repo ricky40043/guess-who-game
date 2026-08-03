@@ -1,9 +1,33 @@
+name: guess-who-game
+
 services:
-  guess-who-game:
-    build: .
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: guess-who-game:latest
     container_name: guess-who-game
     restart: unless-stopped
+    init: true
     ports:
-      - "8080:8080"
+      # 預設只綁 Server 本機，供 Cloudflare Tunnel / Nginx 反向代理使用。
+      # 需要開放區網測試時，把 BIND_ADDRESS 改成 0.0.0.0。
+      - "${BIND_ADDRESS:-127.0.0.1}:${HOST_PORT:-20931}:8080"
     environment:
+      ENV: production
       PORT: "8080"
+      TZ: Asia/Taipei
+    mem_limit: 512m
+    security_opt:
+      - no-new-privileges:true
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8080/api/health"]
+      interval: 20s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
