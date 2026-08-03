@@ -82,9 +82,11 @@ func websocketAccept(key string) string {
 	return base64.StdEncoding.EncodeToString(sum[:])
 }
 
-func (c *rawConn) SetReadLimit(limit int64) { c.readLimit = limit }
+func (c *rawConn) SetReadLimit(limit int64)                 { c.readLimit = limit }
 func (c *rawConn) SetReadDeadline(deadline time.Time) error { return c.conn.SetReadDeadline(deadline) }
-func (c *rawConn) SetWriteDeadline(deadline time.Time) error { return c.conn.SetWriteDeadline(deadline) }
+func (c *rawConn) SetWriteDeadline(deadline time.Time) error {
+	return c.conn.SetWriteDeadline(deadline)
+}
 func (c *rawConn) SetPongHandler(handler func(string) error) { c.pongHandler = handler }
 
 func (c *rawConn) ReadMessage() (int, []byte, error) {
