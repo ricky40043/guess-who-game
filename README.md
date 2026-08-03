@@ -16,7 +16,8 @@
 - 自己的匿名代號與名字自動排除
 - 猜對 1 人得 1 分，全對額外加 2 分
 - 房主與玩家斷線重連、遊戲狀態恢復
-- Docker 與 GitHub Actions CI
+- Docker Compose 與 GitHub Actions CI/CD
+- self-hosted runner 自動部署、健康檢查與失敗回滾
 
 ## 遊戲流程
 
@@ -48,9 +49,47 @@ http://<Mac 的 IP>:8080
 
 ## Docker
 
+本機直接執行：
+
 ```bash
 docker compose up -d --build
 ```
+
+正式 Server 預設只綁定本機介面：
+
+```text
+http://127.0.0.1:20931
+```
+
+供 Cloudflare Tunnel 或 Nginx 反向代理使用。
+
+## 自動 CI/CD
+
+`main` 有新 Commit 時：
+
+```text
+GitHub 雲端測試
+  → gofmt
+  → go test -race
+  → go vet
+  → Go production build
+  → Docker build
+  → 地端 self-hosted runner
+  → Docker Compose 更新
+  → 健康檢查
+  → 失敗自動回滾上一版
+```
+
+Server 第一次準備：
+
+```bash
+bash scripts/setup-server.sh
+```
+
+完整設定請看：
+
+- [地端自動部署指南](docs/地端自動部署指南.md)
+- [架構說明](docs/ARCHITECTURE.md)
 
 ## 技術架構
 
@@ -58,6 +97,7 @@ docker compose up -d --build
 - 即時連線：專案內建 RFC 6455 WebSocket 實作，無第三方執行依賴
 - 前端：原生 JavaScript、HTML、CSS，直接嵌入 Go 執行檔
 - 資料：房間、答案與結果只存在記憶體，服務重啟後清除
+- 部署：Docker Compose + GitHub-hosted CI + self-hosted deploy runner
 
 ## WebSocket 主要事件
 
