@@ -24,7 +24,7 @@ jobs:
 
       - name: gofmt 檢查
         run: |
-          unformatted=$(gofmt -l .)
+          unformatted=$(find . -type f -name '*.go' -not -path './vendor/*' -print0 | xargs -0 gofmt -l)
           if [ -n "$unformatted" ]; then
             echo "以下 Go 檔案尚未 gofmt："
             echo "$unformatted"
