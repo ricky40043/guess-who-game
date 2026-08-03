@@ -1,20 +1,73 @@
-name: CI
+name: CI/CD - 測試與地端部署
 
 on:
   push:
+    branches: [main]
   pull_request:
+    branches: [main]
+  workflow_dispatch:
 
 permissions:
   contents: read
 
 jobs:
   test:
+    name: 測試與建置
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
+
       - uses: actions/setup-go@v5
         with:
           go-version: "1.23.x"
-      - run: go test ./...
-      - run: go vet ./...
-      - run: go build ./...
+
+      - name: gofmt 檢查
+        run: |
+          unformatted=$(gofmt -l .)
+          if [ -n "$unformatted" ]; then
+            echo "以下 Go 檔案尚未 gofmt："
+            echo "$unformatted"
+            exit 1
+          fi
+
+      - name: Go 測試（含 race detector）
+        run: go test -race -timeout 3m ./...
+
+      - name: Go 靜態檢查
+        run: go vet ./...
+
+      - name: Go production build
+        run: CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath -o /tmp/guess-who-game .
+
+      - name: Docker image 建置驗證
+        run: docker build --pull -t guess-who-game:ci .
+
+  deploy:
+    name: 部署到地端 Server
+    needs: test
+    if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
+    runs-on: [self-hosted, guess-who-game-deploy]
+    timeout-minutes: 15
+    concurrency:
+      group: deploy-guess-who-game
+      cancel-in-progress: false
+    env:
+      DEPLOY_ENV_FILE: ${{ vars.DEPLOY_ENV_FILE || '/opt/guess-who-game/.env' }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 檢查 Server 部署環境
+        run: |
+          set -euo pipefail
+          docker version
+          docker compose version
+          if [ ! -f "$DEPLOY_ENV_FILE" ]; then
+            echo "找不到部署設定：$DEPLOY_ENV_FILE"
+            echo "請先在 Server 執行：bash scripts/setup-server.sh"
+            exit 1
+          fi
+
+      - name: 建置、更新、健康檢查與失敗回滾
+        run: bash scripts/deploy.sh
