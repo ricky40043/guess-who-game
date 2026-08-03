@@ -34,9 +34,14 @@ if ! docker info >/dev/null 2>&1; then
 fi
 
 SUDO=""
-if [ ! -w "$(dirname "$DEPLOY_DIR")" ] 2>/dev/null; then
+permission_target="$(dirname "$DEPLOY_DIR")"
+if [ -d "$DEPLOY_DIR" ]; then
+  permission_target="$DEPLOY_DIR"
+fi
+
+if [ ! -w "$permission_target" ]; then
   command -v sudo >/dev/null 2>&1 || {
-    echo "需要建立 $DEPLOY_DIR，但目前沒有權限，也找不到 sudo。"
+    echo "需要建立或修改 $DEPLOY_DIR，但目前沒有權限，也找不到 sudo。"
     exit 1
   }
   SUDO="sudo"
