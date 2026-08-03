@@ -61,29 +61,29 @@ type RevealProfile struct {
 type Room struct {
 	Mu sync.Mutex `json:"-"`
 
-	ID               string                         `json:"id"`
-	HostClientID     string                         `json:"hostClientId"`
-	HostToken        string                         `json:"hostToken"`
-	HostConnected    bool                           `json:"hostConnected"`
-	Status           Status                         `json:"status"`
-	Settings         Settings                       `json:"settings"`
-	Players          map[string]*Player             `json:"players"`
-	Questions        []Question                     `json:"questions"`
-	CurrentIndex     int                            `json:"currentIndex"`
-	Answers          map[string]map[int]string      `json:"answers"`
-	Submitted        map[string]bool                `json:"submitted"`
-	AnswerDeadline   time.Time                      `json:"answerDeadline"`
-	RevealOrder      []string                       `json:"revealOrder"`
-	AliasByPlayer    map[string]string              `json:"aliasByPlayer"`
-	PlayerByAlias    map[string]string              `json:"playerByAlias"`
-	RevealIndex      int                            `json:"revealIndex"`
-	Guesses          map[string]map[string]string   `json:"guesses"`
-	GuessSubmittedAt map[string]time.Time           `json:"guessSubmittedAt"`
-	GuessDeadline    time.Time                      `json:"guessDeadline"`
-	Results          []GuessResult                  `json:"results"`
-	Seq              int                            `json:"seq"`
-	CreatedAt        time.Time                      `json:"createdAt"`
-	UpdatedAt        time.Time                      `json:"updatedAt"`
+	ID               string                       `json:"id"`
+	HostClientID     string                       `json:"hostClientId"`
+	HostToken        string                       `json:"hostToken"`
+	HostConnected    bool                         `json:"hostConnected"`
+	Status           Status                       `json:"status"`
+	Settings         Settings                     `json:"settings"`
+	Players          map[string]*Player           `json:"players"`
+	Questions        []Question                   `json:"questions"`
+	CurrentIndex     int                          `json:"currentIndex"`
+	Answers          map[string]map[int]string    `json:"answers"`
+	Submitted        map[string]bool              `json:"submitted"`
+	AnswerDeadline   time.Time                    `json:"answerDeadline"`
+	RevealOrder      []string                     `json:"revealOrder"`
+	AliasByPlayer    map[string]string            `json:"aliasByPlayer"`
+	PlayerByAlias    map[string]string            `json:"playerByAlias"`
+	RevealIndex      int                          `json:"revealIndex"`
+	Guesses          map[string]map[string]string `json:"guesses"`
+	GuessSubmittedAt map[string]time.Time         `json:"guessSubmittedAt"`
+	GuessDeadline    time.Time                    `json:"guessDeadline"`
+	Results          []GuessResult                `json:"results"`
+	Seq              int                          `json:"seq"`
+	CreatedAt        time.Time                    `json:"createdAt"`
+	UpdatedAt        time.Time                    `json:"updatedAt"`
 }
 
 func DefaultSettings() Settings {
