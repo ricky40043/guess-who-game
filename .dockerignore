@@ -1,0 +1,9 @@
+.git
+.github
+docs
+scripts
+.env
+.env.*
+*.log
+coverage.out
+guess-who-game
