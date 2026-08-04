@@ -35,6 +35,8 @@ jobs:
         run: |
           node --check web/app.js
           node --check web/controls.js
+          node --check web/gameplay-polish.js
+          node --check web/party-effects.js
 
       - name: Go 測試（含 race detector）
         run: go test -race -timeout 3m ./...
