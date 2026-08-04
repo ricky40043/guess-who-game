@@ -121,9 +121,9 @@ func (s *Service) ResetToWaiting(roomID string) (*Event, error) {
 	room.UpdatedAt = time.Now()
 
 	return &Event{Type: "ROOM_RESET", Seq: room.Seq, Payload: map[string]any{
-		"roomId":  room.ID,
-		"status":  room.Status,
+		"roomId":   room.ID,
+		"status":   room.Status,
 		"settings": room.Settings,
-		"players": room.PlayerList(),
+		"players":  room.PlayerList(),
 	}}, nil
 }
