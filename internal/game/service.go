@@ -52,16 +52,12 @@ func randomHex(bytes int) string {
 }
 
 func randomRoomID() string {
-	const alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
-	buffer := make([]byte, 6)
-	raw := make([]byte, 6)
+	raw := make([]byte, 2)
 	if _, err := rand.Read(raw); err != nil {
-		return strings.ToUpper(randomHex(3))
+		return fmt.Sprintf("%04d", time.Now().UnixNano()%10000)
 	}
-	for i := range buffer {
-		buffer[i] = alphabet[int(raw[i])%len(alphabet)]
-	}
-	return string(buffer)
+	value := (int(raw[0])<<8 | int(raw[1])) % 10000
+	return fmt.Sprintf("%04d", value)
 }
 
 func normalizeSettings(input Settings) Settings {
