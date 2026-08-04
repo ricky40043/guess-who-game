@@ -56,11 +56,11 @@
       replace.addEventListener('click', () => confirmAndSend('確定換掉目前題目？本題所有已作答內容會清除，題號不變並重新完整倒數。', 'SKIP_QUESTION'))
       controls.appendChild(replace)
 
-      const forceGuess = document.createElement('button')
-      forceGuess.className = 'btn secondary'
-      forceGuess.textContent = '直接進入猜人'
-      forceGuess.addEventListener('click', () => confirmAndSend('確定跳過剩餘流程，直接進入猜人環節？', 'FORCE_START_GUESSING'))
-      controls.appendChild(forceGuess)
+      const forceReveal = document.createElement('button')
+      forceReveal.className = 'btn secondary'
+      forceReveal.textContent = '直接進入公布'
+      forceReveal.addEventListener('click', () => confirmAndSend('確定跳過剩餘作答題目，直接進入匿名同學答案公布環節？', 'FORCE_START_GUESSING'))
+      controls.appendChild(forceReveal)
     }
 
     const reset = document.createElement('button')
