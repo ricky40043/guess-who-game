@@ -25,6 +25,7 @@ fail() {
 
 command -v docker >/dev/null 2>&1 || fail "找不到 docker"
 docker compose version >/dev/null 2>&1 || fail "找不到 docker compose plugin"
+command -v curl >/dev/null 2>&1 || fail "找不到 curl，無法驗證公開網址；請先安裝 curl"
 [ -f "$ENV_FILE" ] || fail "找不到部署設定檔：$ENV_FILE"
 
 if command -v flock >/dev/null 2>&1; then
@@ -60,11 +61,6 @@ verify_local_version() {
 verify_public_release() {
   local version_response
   local app_js
-
-  command -v curl >/dev/null 2>&1 || {
-    log "Server 找不到 curl，跳過公開網址驗證"
-    return 0
-  }
 
   version_response=$(curl -fsS --max-time 20 -H 'Cache-Control: no-cache' "$PUBLIC_URL/api/version?ts=$(date +%s)") || return 1
   log "公開網址版本：$version_response"
