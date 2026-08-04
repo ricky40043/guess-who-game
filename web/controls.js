@@ -39,7 +39,7 @@
   }
 
   function injectHostControls() {
-    document.querySelector('#host-live-controls')?.remove()
+    if (document.querySelector('#host-live-controls')) return
     if (!state.isHost || !state.roomId || state.status === 'home' || state.status === 'waiting') return
 
     const card = document.querySelector('.card')
