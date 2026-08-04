@@ -136,6 +136,18 @@ function applySnapshot(data) {
   }
 }
 
+function updateLiveStatus() {
+  const timer = document.querySelector('#countdown')
+  if (timer) timer.textContent = state.timeLeft
+
+  const total = state.players.length
+  const ratio = total ? Math.round(state.submittedCount / total * 100) : 0
+  const progress = document.querySelector('#progress-bar')
+  if (progress) progress.style.width = `${ratio}%`
+  const text = document.querySelector('#progress-text')
+  if (text) text.textContent = `${state.submittedCount} / ${total} 人已提交`
+}
+
 function handleMessage(message) {
   const data = message.data || {}
   switch (message.type) {
@@ -164,15 +176,24 @@ function handleMessage(message) {
     case 'GAME_STARTED': break
     case 'QUESTION_STARTED': applyQuestion(data); break
     case 'ANSWER_ACCEPTED': state.hasSubmitted = true; state.myAnswer = data.answer; toast('答案已送出，可在時間內修改'); break
-    case 'ANSWER_PROGRESS': state.submittedCount = data.submittedCount || 0; break
+    case 'ANSWER_PROGRESS':
+      state.submittedCount = data.submittedCount || 0
+      updateLiveStatus()
+      return
     case 'REVEAL_STARTED':
     case 'PROFILE_REVEALED':
       state.status = 'revealing'; state.reveal = data; state.revealComplete = false; break
     case 'REVEAL_COMPLETE': state.revealComplete = true; break
     case 'GUESSING_STARTED': applyGuessing(data); break
     case 'GUESS_ACCEPTED': state.hasGuessed = true; toast('配對已送出'); break
-    case 'GUESS_PROGRESS': state.submittedCount = data.submittedCount || 0; break
-    case 'TIMER_UPDATE': state.timeLeft = data.timeLeft; break
+    case 'GUESS_PROGRESS':
+      state.submittedCount = data.submittedCount || 0
+      updateLiveStatus()
+      return
+    case 'TIMER_UPDATE':
+      state.timeLeft = data.timeLeft
+      updateLiveStatus()
+      return
     case 'GAME_FINISHED':
       state.status = 'finished'; state.results = data.results || []; state.identities = data.identities || []; break
     case 'HOST_DISCONNECTED': toast('房主畫面斷線，等待重新連線'); break
@@ -216,11 +237,12 @@ function homeView() {
 
 function lobbyView() {
   const joinURL = `${location.origin}/?room=${state.roomId}`
+  const qrURL = `https://api.qrserver.com/v1/create-qr-code/?size=240x240&margin=8&data=${encodeURIComponent(joinURL)}`
   const playerPills = state.players.map(p => `<span class="player-pill ${p.connected ? '' : 'offline'}">${p.connected ? '🟢' : '⚪'} ${esc(p.name)}</span>`).join('') || '<span class="muted">等待玩家加入…</span>'
   const settings = state.settings
   const options = state.bank.map(q => `<label class="question-option"><input type="checkbox" class="question-check" value="${q.id}" ${settings.questionIds?.includes(q.id) ? 'checked' : ''}/><span><strong>${esc(q.text)}</strong><br><small class="muted">${esc(q.category)}</small></span></label>`).join('')
   return `<div class="shell">${header()}<div class="grid two">
-    <section class="card center"><h2>房間代碼</h2><div class="room-code">${esc(state.roomId)}</div><p class="muted">玩家輸入代碼與暱稱即可加入</p><div class="actions" style="justify-content:center"><button class="btn secondary" id="copy-link">複製加入連結</button></div><hr style="border-color:#26364d;margin:24px 0"><h3>玩家 ${state.players.length} 人</h3><div class="players">${playerPills}</div></section>
+    <section class="card center"><h2>掃描 QR Code 加入</h2><img class="qr-code" src="${qrURL}" alt="掃描加入房間 ${esc(state.roomId)}" referrerpolicy="no-referrer"><div class="room-code">${esc(state.roomId)}</div><p class="muted">掃描後輸入暱稱即可加入，也可以手動輸入房號。</p><div class="actions" style="justify-content:center"><button class="btn secondary" id="copy-link">複製加入連結</button></div><hr style="border-color:#26364d;margin:24px 0"><h3>玩家 ${state.players.length} 人</h3><div class="players">${playerPills}</div></section>
     <section class="card">
       ${state.isHost ? `<h2>遊戲設定</h2>
         <div class="grid two"><div class="field"><label>每題作答秒數</label><input id="answer-seconds" type="number" min="15" max="300" value="${settings.answerSeconds}" /></div><div class="field"><label>猜人秒數</label><input id="guess-seconds" type="number" min="30" max="600" value="${settings.guessSeconds}" /></div></div>
@@ -235,9 +257,9 @@ function lobbyView() {
 function answeringView() {
   const ratio = state.players.length ? Math.round(state.submittedCount / state.players.length * 100) : 0
   return `<div class="shell">${header()}<section class="card center">
-    <div class="timer">${state.timeLeft}</div><div class="muted">第 ${state.questionNumber} / ${state.totalQuestions} 題</div>
+    <div class="timer" id="countdown">${state.timeLeft}</div><div class="muted">第 ${state.questionNumber} / ${state.totalQuestions} 題</div>
     <div class="question">${esc(state.question?.text)}</div>
-    <div class="progress"><span style="width:${ratio}%"></span></div><p class="muted">${state.submittedCount} / ${state.players.length} 人已提交</p>
+    <div class="progress"><span id="progress-bar" style="width:${ratio}%"></span></div><p class="muted" id="progress-text">${state.submittedCount} / ${state.players.length} 人已提交</p>
     ${state.isHost ? `<p>所有人提交後會自動進入下一題。</p>` : `<div class="field" style="max-width:700px;margin:20px auto"><textarea id="answer-input" maxlength="200" placeholder="輸入你的答案…">${esc(state.myAnswer)}</textarea></div><button class="btn large" id="submit-answer">${state.hasSubmitted ? '修改答案' : '送出答案'}</button>`}
   </section></div>`
 }
@@ -258,7 +280,7 @@ function guessingView() {
     return `<div class="match-row"><div class="match-alias">${esc(alias)}</div><select class="guess-select" data-alias="${esc(alias)}" ${state.hasGuessed ? 'disabled' : ''}>${options}</select></div>`
   }).join('')
   const ratio = state.players.length ? Math.round(state.submittedCount / state.players.length * 100) : 0
-  return `<div class="shell">${header()}<section class="card"><div class="timer">${state.timeLeft}</div><h2 class="center">把匿名答案配對到正確玩家</h2><p class="muted center">自己的「${esc(state.ownAlias || '匿名代號')}」與自己的名字已排除。</p><div class="progress"><span style="width:${ratio}%"></span></div><p class="muted center">${state.submittedCount} / ${state.players.length} 人已提交</p>
+  return `<div class="shell">${header()}<section class="card"><div class="timer" id="countdown">${state.timeLeft}</div><h2 class="center">把匿名答案配對到正確玩家</h2><p class="muted center">自己的「${esc(state.ownAlias || '匿名代號')}」與自己的名字已排除。</p><div class="progress"><span id="progress-bar" style="width:${ratio}%"></span></div><p class="muted center" id="progress-text">${state.submittedCount} / ${state.players.length} 人已提交</p>
     ${state.isHost ? '<p class="center">玩家正在手機上完成配對。</p>' : `<div class="match-list">${rows}</div><div class="actions" style="justify-content:center"><button class="btn large" id="submit-guesses" ${state.hasGuessed ? 'disabled' : ''}>${state.hasGuessed ? '已提交，等待其他人' : '提交全部配對'}</button></div>`}
   </section></div>`
 }
@@ -297,6 +319,7 @@ function bindEvents() {
   })
   document.querySelector('#save-settings')?.addEventListener('click', saveSettings)
   document.querySelector('#start-game')?.addEventListener('click', () => send('START_GAME'))
+  document.querySelector('#answer-input')?.addEventListener('input', event => { state.myAnswer = event.target.value })
   document.querySelector('#submit-answer')?.addEventListener('click', () => {
     const answer = document.querySelector('#answer-input').value.trim()
     if (!answer) return toast('答案不能空白')
