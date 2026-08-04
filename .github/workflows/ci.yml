@@ -31,6 +31,30 @@ jobs:
             exit 1
           fi
 
+      - name: JavaScript 語法檢查
+        run: node --check web/app.js
+
+      - name: 手機答題失焦回歸檢查
+        run: |
+          node <<'NODE'
+          const fs = require('fs')
+          const source = fs.readFileSync('web/app.js', 'utf8')
+          const required = [
+            "socket.onopen = () => {\n    state.connected = true\n    updateConnectionStatus()",
+            "socket.onclose = () => {\n    state.connected = false\n    updateConnectionStatus()",
+            "case 'TIMER_UPDATE': state.timeLeft = data.timeLeft; updateLiveStatus(); return",
+            "case 'ANSWER_PROGRESS': state.submittedCount = data.submittedCount || 0; updateLiveStatus(); return",
+            "case 'HOST_DISCONNECTED': toast('房主畫面斷線，等待重新連線'); return",
+          ]
+          for (const marker of required) {
+            if (!source.includes(marker)) {
+              console.error('缺少防失焦標記：', marker)
+              process.exit(1)
+            }
+          }
+          console.log('答題期間的即時事件均採局部更新，不會重建 textarea')
+          NODE
+
       - name: Go 測試（含 race detector）
         run: go test -race -timeout 3m ./...
 
