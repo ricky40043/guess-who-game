@@ -111,24 +111,48 @@
     cancelSpeech()
     if (state.status !== 'revealing' || !state.reveal?.profile) return
     remember(state.reveal)
-    setStatus('正在語音朗讀…')
-
-    const profile = state.reveal.profile
-    const text = [profile.alias]
-    for (const item of profile.answers || []) {
-      text.push(`題目，${item.question}。答案，${item.answer}。`)
-    }
 
     const token = ++speechToken
+    const profile = state.reveal.profile
+    const items = Array.isArray(profile.answers) ? profile.answers : []
+
     if (!window.speechSynthesis || !window.SpeechSynthesisUtterance) {
       return pauseAfterSpeech(token)
     }
 
-    const utterance = new SpeechSynthesisUtterance(text.join(' '))
+    speakText(token, profile.alias, () => speakAnswerItem(token, items, 0))
+  }
+
+  function speakAnswerItem(token, items, index) {
+    if (token !== speechToken || state.status !== 'revealing') return
+    if (index >= items.length) {
+      pauseAfterSpeech(token)
+      return
+    }
+
+    const item = items[index]
+    setStatus(`正在朗讀第 ${index + 1} 題…`)
+    speakText(token, `題目，${item.question}。`, () => {
+      speakText(token, `答案，${item.answer}。`, () => {
+        pauseTimer = window.setTimeout(() => {
+          pauseTimer = null
+          speakAnswerItem(token, items, index + 1)
+        }, 500)
+      })
+    })
+  }
+
+  function speakText(token, text, onEnd) {
+    if (token !== speechToken || state.status !== 'revealing') return
+    const utterance = new SpeechSynthesisUtterance(text)
     utterance.lang = 'zh-TW'
     utterance.rate = 0.92
-    utterance.onend = () => pauseAfterSpeech(token)
-    utterance.onerror = () => pauseAfterSpeech(token)
+    utterance.onend = () => {
+      if (token === speechToken) onEnd()
+    }
+    utterance.onerror = () => {
+      if (token === speechToken) onEnd()
+    }
     window.speechSynthesis.speak(utterance)
   }
 
@@ -156,7 +180,10 @@
 
   function cancelSpeech() {
     speechToken += 1
-    if (pauseTimer) window.clearInterval(pauseTimer)
+    if (pauseTimer) {
+      window.clearInterval(pauseTimer)
+      window.clearTimeout(pauseTimer)
+    }
     pauseTimer = null
     if (window.speechSynthesis) window.speechSynthesis.cancel()
   }
