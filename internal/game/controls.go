@@ -1,12 +1,13 @@
 package game
 
 import (
+	"errors"
 	mathrand "math/rand"
 	"time"
 )
 
-// SkipQuestion discards every answer for the current question and advances.
-// The next question always receives a fresh full countdown.
+// SkipQuestion 保留既有 WebSocket 指令名稱，但行為改為替換目前題目。
+// 題號不變、目前題目的所有答案清除，並從完整秒數重新倒數。
 func (s *Service) SkipQuestion(roomID string) (*Event, error) {
 	room, err := s.GetRoom(roomID)
 	if err != nil {
@@ -18,14 +19,33 @@ func (s *Service) SkipQuestion(roomID string) (*Event, error) {
 		return nil, ErrInvalidState
 	}
 
-	questionID := room.Questions[room.CurrentIndex].ID
+	used := make(map[int]bool, len(room.Questions))
+	for _, question := range room.Questions {
+		used[question.ID] = true
+	}
+	candidates := make([]Question, 0, len(s.bank))
+	for _, question := range s.bank {
+		if !used[question.ID] {
+			candidates = append(candidates, question)
+		}
+	}
+	if len(candidates) == 0 {
+		return nil, errors.New("題庫已沒有可替換的新題目")
+	}
+
+	oldQuestionID := room.Questions[room.CurrentIndex].ID
+	random := mathrand.New(mathrand.NewSource(time.Now().UnixNano()))
+	room.Questions[room.CurrentIndex] = candidates[random.Intn(len(candidates))]
 	for playerID := range room.Players {
 		if room.Answers[playerID] != nil {
-			delete(room.Answers[playerID], questionID)
+			delete(room.Answers[playerID], oldQuestionID)
 		}
 	}
 	room.Submitted = make(map[string]bool)
-	return s.advanceQuestionLocked(room), nil
+	room.AnswerDeadline = time.Now().Add(time.Duration(room.Settings.AnswerSeconds) * time.Second)
+	room.Seq++
+	room.UpdatedAt = time.Now()
+	return &Event{Type: "QUESTION_STARTED", Seq: room.Seq, Payload: questionPayloadLocked(room)}, nil
 }
 
 // ForceStartGuessing skips the remaining answering/reveal flow and starts guessing.
@@ -43,7 +63,6 @@ func (s *Service) ForceStartGuessing(roomID string) (*Event, error) {
 		return nil, ErrInvalidState
 	}
 
-	// Create stable anonymous identities even when reveal was skipped.
 	room.RevealOrder = room.RevealOrder[:0]
 	for playerID := range room.Players {
 		room.RevealOrder = append(room.RevealOrder, playerID)
@@ -98,13 +117,13 @@ func (s *Service) ResetToWaiting(roomID string) (*Event, error) {
 	room.GuessSubmittedAt = make(map[string]time.Time)
 	room.GuessDeadline = time.Time{}
 	room.Results = nil
-	room.Seq++ // invalidate every running timer goroutine
+	room.Seq++
 	room.UpdatedAt = time.Now()
 
 	return &Event{Type: "ROOM_RESET", Seq: room.Seq, Payload: map[string]any{
-		"roomId":   room.ID,
-		"status":   room.Status,
+		"roomId":  room.ID,
+		"status":  room.Status,
 		"settings": room.Settings,
-		"players":  room.PlayerList(),
+		"players": room.PlayerList(),
 	}}, nil
 }
