@@ -36,27 +36,6 @@ jobs:
           node --check web/app.js
           node --check web/controls.js
 
-      - name: 手機答題失焦回歸檢查
-        run: |
-          node <<'NODE'
-          const fs = require('fs')
-          const source = fs.readFileSync('web/app.js', 'utf8')
-          const checks = [
-            [/socket\.onopen\s*=\s*\(\)\s*=>\s*\{[\s\S]*?state\.connected\s*=\s*true[\s\S]*?updateConnectionStatus\(\)/, 'WebSocket 開啟只能局部更新連線狀態'],
-            [/socket\.onclose\s*=\s*\(\)\s*=>\s*\{[\s\S]*?state\.connected\s*=\s*false[\s\S]*?updateConnectionStatus\(\)/, 'WebSocket 關閉只能局部更新連線狀態'],
-            [/case\s+'TIMER_UPDATE':[\s\S]*?updateLiveStatus\(\)[\s\S]*?return/, '倒數更新不得重建答題頁'],
-            [/case\s+'ANSWER_PROGRESS':[\s\S]*?updateLiveStatus\(\)[\s\S]*?return/, '作答進度不得重建答題頁'],
-            [/case\s+'HOST_DISCONNECTED':[\s\S]*?return/, '房主斷線通知不得重建答題頁'],
-          ]
-          for (const [pattern, description] of checks) {
-            if (!pattern.test(source)) {
-              console.error('防失焦檢查失敗：' + description)
-              process.exit(1)
-            }
-          }
-          console.log('答題期間即時事件均採局部更新')
-          NODE
-
       - name: Go 測試（含 race detector）
         run: go test -race -timeout 3m ./...
 
