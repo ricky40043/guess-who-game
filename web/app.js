@@ -2,34 +2,12 @@ const SESSION_KEY = 'guess_who_session'
 const defaultSettings = { questionCount: 5, answerSeconds: 60, guessSeconds: 120, questionMode: 'random', questionIds: [], customTexts: [] }
 
 const state = {
-  connected: false,
-  roomId: '',
-  playerId: '',
-  playerName: '',
-  hostToken: '',
-  isHost: false,
-  status: 'home',
-  settings: { ...defaultSettings },
-  players: [],
-  bank: [],
-  question: null,
-  questionIndex: 0,
-  questionNumber: 0,
-  totalQuestions: 0,
-  timeLeft: 0,
-  submittedCount: 0,
-  hasSubmitted: false,
-  myAnswer: '',
-  reveal: null,
-  revealComplete: false,
-  aliases: [],
-  guessPlayers: [],
-  ownAlias: '',
-  ownPlayerId: '',
-  guesses: {},
-  hasGuessed: false,
-  results: [],
-  identities: [],
+  connected: false, roomId: '', playerId: '', playerName: '', hostToken: '', isHost: false,
+  status: 'home', settings: { ...defaultSettings }, players: [], bank: [], question: null,
+  questionIndex: 0, questionNumber: 0, totalQuestions: 0, timeLeft: 0, submittedCount: 0,
+  hasSubmitted: false, myAnswer: '', reveal: null, revealComplete: false, aliases: [],
+  guessPlayers: [], ownAlias: '', ownPlayerId: '', guesses: {}, hasGuessed: false,
+  results: [], identities: [],
 }
 
 let socket
@@ -46,16 +24,16 @@ function connect() {
   socket = new WebSocket(wsURL())
   socket.onopen = () => {
     state.connected = true
-    render()
+    updateConnectionStatus()
     const session = loadSession()
     if (session?.roomId) send('REJOIN_ROOM', session)
   }
   socket.onclose = () => {
     state.connected = false
-    render()
+    updateConnectionStatus()
     reconnectTimer = setTimeout(connect, 1800)
   }
-  socket.onmessage = (event) => {
+  socket.onmessage = event => {
     try { handleMessage(JSON.parse(event.data)) } catch (error) { console.error(error) }
   }
 }
@@ -123,23 +101,23 @@ function applySnapshot(data) {
     case 'waiting': break
     case 'answering': applyQuestion(data); break
     case 'revealing':
-      state.status = 'revealing'
-      state.reveal = data.reveal || null
-      state.revealComplete = Boolean(data.revealComplete)
-      break
+      state.status = 'revealing'; state.reveal = data.reveal || null; state.revealComplete = Boolean(data.revealComplete); break
     case 'guessing': applyGuessing(data); break
     case 'finished':
-      state.status = 'finished'
-      state.results = data.results || []
-      state.identities = data.identities || []
-      break
+      state.status = 'finished'; state.results = data.results || []; state.identities = data.identities || []; break
   }
+}
+
+function updateConnectionStatus() {
+  const el = document.querySelector('.connection')
+  if (!el) return
+  el.textContent = state.connected ? '● 已連線' : '● 重新連線中'
+  el.classList.toggle('online', state.connected)
 }
 
 function updateLiveStatus() {
   const timer = document.querySelector('#countdown')
   if (timer) timer.textContent = state.timeLeft
-
   const total = state.players.length
   const ratio = total ? Math.round(state.submittedCount / total * 100) : 0
   const progress = document.querySelector('#progress-bar')
@@ -148,64 +126,70 @@ function updateLiveStatus() {
   if (text) text.textContent = `${state.submittedCount} / ${total} 人已提交`
 }
 
+function updateAnswerAccepted(answer) {
+  state.hasSubmitted = true
+  state.myAnswer = answer
+  const button = document.querySelector('#submit-answer')
+  if (button) button.textContent = '修改答案'
+  toast('答案已送出，可在時間內修改')
+}
+
+function updateWaitingPlayers() {
+  if (state.status !== 'waiting') return
+  const players = document.querySelector('#waiting-players')
+  const count = document.querySelector('#waiting-player-count')
+  if (count) count.textContent = `玩家 ${state.players.length} 人`
+  if (players) players.innerHTML = state.players.map(p => `<span class="player-pill ${p.connected ? '' : 'offline'}">${p.connected ? '🟢' : '⚪'} ${esc(p.name)}</span>`).join('') || '<span class="muted">等待玩家加入…</span>'
+}
+
 function handleMessage(message) {
   const data = message.data || {}
   switch (message.type) {
     case 'ROOM_CREATED':
-      mergeRoom({ ...data, isHost: true })
-      state.playerId = ''
-      saveSession()
-      toast('房間建立完成')
-      break
+      mergeRoom({ ...data, isHost: true }); state.playerId = ''; saveSession(); toast('房間建立完成'); render(); return
     case 'JOIN_SUCCESS':
-      applySnapshot({ ...data, isHost: false })
-      saveSession()
-      toast(`歡迎，${state.playerName}`)
-      break
+      applySnapshot({ ...data, isHost: false }); saveSession(); toast(`歡迎，${state.playerName}`); render(); return
     case 'REJOIN_SUCCESS':
-      applySnapshot(data)
-      saveSession()
-      toast('已恢復連線')
-      break
+      applySnapshot(data); saveSession(); toast('已恢復連線'); render(); return
     case 'PLAYER_JOINED':
     case 'PLAYER_REJOINED':
     case 'PLAYER_DISCONNECTED':
       state.players = data.players || []
-      break
-    case 'SETTINGS_UPDATED': state.settings = data.settings; toast('設定已更新'); break
-    case 'GAME_STARTED': break
-    case 'QUESTION_STARTED': applyQuestion(data); break
-    case 'ANSWER_ACCEPTED': state.hasSubmitted = true; state.myAnswer = data.answer; toast('答案已送出，可在時間內修改'); break
-    case 'ANSWER_PROGRESS':
-      state.submittedCount = data.submittedCount || 0
+      updateWaitingPlayers()
       updateLiveStatus()
       return
+    case 'SETTINGS_UPDATED':
+      state.settings = data.settings
+      toast('設定已更新')
+      if (state.status === 'waiting') render()
+      return
+    case 'GAME_STARTED': return
+    case 'QUESTION_STARTED': applyQuestion(data); render(); return
+    case 'ANSWER_ACCEPTED': updateAnswerAccepted(data.answer); return
+    case 'ANSWER_PROGRESS': state.submittedCount = data.submittedCount || 0; updateLiveStatus(); return
     case 'REVEAL_STARTED':
     case 'PROFILE_REVEALED':
-      state.status = 'revealing'; state.reveal = data; state.revealComplete = false; break
-    case 'REVEAL_COMPLETE': state.revealComplete = true; break
-    case 'GUESSING_STARTED': applyGuessing(data); break
-    case 'GUESS_ACCEPTED': state.hasGuessed = true; toast('配對已送出'); break
-    case 'GUESS_PROGRESS':
-      state.submittedCount = data.submittedCount || 0
-      updateLiveStatus()
+      state.status = 'revealing'; state.reveal = data; state.revealComplete = false; render(); return
+    case 'REVEAL_COMPLETE': state.revealComplete = true; render(); return
+    case 'GUESSING_STARTED': applyGuessing(data); render(); return
+    case 'GUESS_ACCEPTED':
+      state.hasGuessed = true
+      document.querySelector('#submit-guesses')?.setAttribute('disabled', '')
+      toast('配對已送出')
       return
-    case 'TIMER_UPDATE':
-      state.timeLeft = data.timeLeft
-      updateLiveStatus()
-      return
+    case 'GUESS_PROGRESS': state.submittedCount = data.submittedCount || 0; updateLiveStatus(); return
+    case 'TIMER_UPDATE': state.timeLeft = data.timeLeft; updateLiveStatus(); return
     case 'GAME_FINISHED':
-      state.status = 'finished'; state.results = data.results || []; state.identities = data.identities || []; break
-    case 'HOST_DISCONNECTED': toast('房主畫面斷線，等待重新連線'); break
-    case 'HOST_RECONNECTED': toast('房主已恢復連線'); break
+      state.status = 'finished'; state.results = data.results || []; state.identities = data.identities || []; render(); return
+    case 'HOST_DISCONNECTED': toast('房主畫面斷線，等待重新連線'); return
+    case 'HOST_RECONNECTED': toast('房主已恢復連線'); return
     case 'ROOM_CLOSED':
-      clearSession(); resetState(); toast(data.message || '房間已關閉'); break
+      clearSession(); resetState(); toast(data.message || '房間已關閉'); render(); return
     case 'ERROR':
-      if (data.code === 'REJOIN_FAILED') { clearSession(); resetState() }
+      if (data.code === 'REJOIN_FAILED') { clearSession(); resetState(); render() }
       toast(data.message || '操作失敗')
-      break
+      return
   }
-  render()
 }
 
 function resetState() {
@@ -242,7 +226,7 @@ function lobbyView() {
   const settings = state.settings
   const options = state.bank.map(q => `<label class="question-option"><input type="checkbox" class="question-check" value="${q.id}" ${settings.questionIds?.includes(q.id) ? 'checked' : ''}/><span><strong>${esc(q.text)}</strong><br><small class="muted">${esc(q.category)}</small></span></label>`).join('')
   return `<div class="shell">${header()}<div class="grid two">
-    <section class="card center"><h2>掃描 QR Code 加入</h2><img class="qr-code" src="${qrURL}" alt="掃描加入房間 ${esc(state.roomId)}" referrerpolicy="no-referrer"><div class="room-code">${esc(state.roomId)}</div><p class="muted">掃描後輸入暱稱即可加入，也可以手動輸入房號。</p><div class="actions" style="justify-content:center"><button class="btn secondary" id="copy-link">複製加入連結</button></div><hr style="border-color:#26364d;margin:24px 0"><h3>玩家 ${state.players.length} 人</h3><div class="players">${playerPills}</div></section>
+    <section class="card center"><h2>掃描 QR Code 加入</h2><img class="qr-code" src="${qrURL}" alt="掃描加入房間 ${esc(state.roomId)}" referrerpolicy="no-referrer"><div class="room-code">${esc(state.roomId)}</div><p class="muted">掃描後輸入暱稱即可加入，也可以手動輸入房號。</p><div class="actions" style="justify-content:center"><button class="btn secondary" id="copy-link">複製加入連結</button></div><hr style="border-color:#26364d;margin:24px 0"><h3 id="waiting-player-count">玩家 ${state.players.length} 人</h3><div class="players" id="waiting-players">${playerPills}</div></section>
     <section class="card">
       ${state.isHost ? `<h2>遊戲設定</h2>
         <div class="grid two"><div class="field"><label>每題作答秒數</label><input id="answer-seconds" type="number" min="15" max="300" value="${settings.answerSeconds}" /></div><div class="field"><label>猜人秒數</label><input id="guess-seconds" type="number" min="30" max="600" value="${settings.guessSeconds}" /></div></div>
@@ -260,7 +244,7 @@ function answeringView() {
     <div class="timer" id="countdown">${state.timeLeft}</div><div class="muted">第 ${state.questionNumber} / ${state.totalQuestions} 題</div>
     <div class="question">${esc(state.question?.text)}</div>
     <div class="progress"><span id="progress-bar" style="width:${ratio}%"></span></div><p class="muted" id="progress-text">${state.submittedCount} / ${state.players.length} 人已提交</p>
-    ${state.isHost ? `<p>所有人提交後會自動進入下一題。</p>` : `<div class="field" style="max-width:700px;margin:20px auto"><textarea id="answer-input" maxlength="200" placeholder="輸入你的答案…">${esc(state.myAnswer)}</textarea></div><button class="btn large" id="submit-answer">${state.hasSubmitted ? '修改答案' : '送出答案'}</button>`}
+    ${state.isHost ? `<p>所有人提交後會自動進入下一題。</p>` : `<div class="field" style="max-width:700px;margin:20px auto"><textarea id="answer-input" maxlength="200" enterkeyhint="done" placeholder="輸入你的答案…">${esc(state.myAnswer)}</textarea></div><button class="btn large" id="submit-answer">${state.hasSubmitted ? '修改答案' : '送出答案'}</button>`}
   </section></div>`
 }
 
@@ -353,12 +337,13 @@ function saveSettings() {
     questionCount: Number(document.querySelector('#question-count')?.value || 5),
     answerSeconds: Number(document.querySelector('#answer-seconds').value),
     guessSeconds: Number(document.querySelector('#guess-seconds').value),
-    questionMode: mode,
-    questionIds,
-    customTexts,
+    questionMode: mode, questionIds, customTexts,
   })
 }
 
-fetch('/api/questions').then(r => r.json()).then(data => { state.bank = data.questions || []; render() }).catch(() => {})
+fetch('/api/questions').then(r => r.json()).then(data => {
+  state.bank = data.questions || []
+  if (state.status === 'home' || state.status === 'waiting') render()
+}).catch(() => {})
 render()
 connect()
