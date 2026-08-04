@@ -1,6 +1,9 @@
 package game
 
-import "testing"
+import (
+	"testing"
+	"time"
+)
 
 func newControlTestRoom(t *testing.T) (*Service, *Room) {
 	t.Helper()
@@ -48,7 +51,7 @@ func TestSkipQuestionClearsAnswersAndRestartsCountdown(t *testing.T) {
 		t.Fatal("skipped question answer was not deleted")
 	}
 	remaining := room.AnswerDeadline.Sub(room.UpdatedAt)
-	if remaining < 59 || remaining > 61 {
+	if remaining < 59*time.Second || remaining > 61*time.Second {
 		t.Fatalf("countdown was not reset: %v", remaining)
 	}
 }
