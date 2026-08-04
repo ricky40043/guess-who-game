@@ -5,6 +5,8 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+      args:
+        BUILD_VERSION: ${BUILD_VERSION:-dev}
     image: guess-who-game:latest
     container_name: guess-who-game
     restart: unless-stopped
