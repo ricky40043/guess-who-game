@@ -48,7 +48,8 @@ func (s *Service) SkipQuestion(roomID string) (*Event, error) {
 	return &Event{Type: "QUESTION_STARTED", Seq: room.Seq, Payload: questionPayloadLocked(room)}, nil
 }
 
-// ForceStartGuessing skips the remaining answering/reveal flow and starts guessing.
+// ForceStartGuessing 保留既有 WebSocket 指令名稱，但實際行為是跳過剩餘作答，
+// 直接進入匿名同學答案公布環節；全部公布後才進入猜人。
 func (s *Service) ForceStartGuessing(roomID string) (*Event, error) {
 	room, err := s.GetRoom(roomID)
 	if err != nil {
@@ -56,36 +57,14 @@ func (s *Service) ForceStartGuessing(roomID string) (*Event, error) {
 	}
 	room.Mu.Lock()
 	defer room.Mu.Unlock()
-	if room.Status != StatusAnswering && room.Status != StatusRevealing {
+	if room.Status != StatusAnswering {
 		return nil, ErrInvalidState
 	}
 	if len(room.Players) < 2 {
 		return nil, ErrInvalidState
 	}
 
-	room.RevealOrder = room.RevealOrder[:0]
-	for playerID := range room.Players {
-		room.RevealOrder = append(room.RevealOrder, playerID)
-	}
-	mathrand.New(mathrand.NewSource(time.Now().UnixNano())).Shuffle(len(room.RevealOrder), func(i, j int) {
-		room.RevealOrder[i], room.RevealOrder[j] = room.RevealOrder[j], room.RevealOrder[i]
-	})
-	room.AliasByPlayer = make(map[string]string, len(room.RevealOrder))
-	room.PlayerByAlias = make(map[string]string, len(room.RevealOrder))
-	for index, playerID := range room.RevealOrder {
-		alias := aliasFor(index)
-		room.AliasByPlayer[playerID] = alias
-		room.PlayerByAlias[alias] = playerID
-	}
-
-	room.Status = StatusGuessing
-	room.RevealIndex = len(room.RevealOrder)
-	room.Guesses = make(map[string]map[string]string)
-	room.GuessSubmittedAt = make(map[string]time.Time)
-	room.GuessDeadline = time.Now().Add(time.Duration(room.Settings.GuessSeconds) * time.Second)
-	room.Seq++
-	room.UpdatedAt = time.Now()
-	return &Event{Type: "GUESSING_STARTED", Seq: room.Seq, Payload: guessingPayloadLocked(room)}, nil
+	return s.beginRevealLocked(room), nil
 }
 
 // ResetToWaiting ends the current round while preserving the room and players.
