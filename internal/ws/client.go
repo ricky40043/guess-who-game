@@ -234,6 +234,39 @@ func (c *Client) handle(message *Envelope) {
 		c.hub.Broadcast(c.RoomID, "GAME_STARTED", map[string]any{"roomId": c.RoomID})
 		c.hub.processEvent(c.RoomID, event)
 
+	case "SKIP_QUESTION":
+		if !c.requireHost() {
+			return
+		}
+		event, err := c.hub.service.SkipQuestion(c.RoomID)
+		if err != nil {
+			c.Error("SKIP_FAILED", err.Error())
+			return
+		}
+		c.hub.processEvent(c.RoomID, event)
+
+	case "FORCE_START_GUESSING":
+		if !c.requireHost() {
+			return
+		}
+		event, err := c.hub.service.ForceStartGuessing(c.RoomID)
+		if err != nil {
+			c.Error("GUESS_START_FAILED", err.Error())
+			return
+		}
+		c.hub.processEvent(c.RoomID, event)
+
+	case "RESET_TO_LOBBY":
+		if !c.requireHost() {
+			return
+		}
+		event, err := c.hub.service.ResetToWaiting(c.RoomID)
+		if err != nil {
+			c.Error("RESET_FAILED", err.Error())
+			return
+		}
+		c.hub.processEvent(c.RoomID, event)
+
 	case "SUBMIT_ANSWER":
 		if c.IsHost || c.PlayerID == "" {
 			c.Error("NOT_PLAYER", "房主控制畫面不能作答，請用手機加入")
