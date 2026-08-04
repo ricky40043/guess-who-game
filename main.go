@@ -7,6 +7,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/ricky40043/guess-who-game/internal/game"
@@ -42,7 +43,23 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	mux.Handle("/", http.FileServer(http.FS(staticFS)))
+	indexBytes, err := fs.ReadFile(staticFS, "index.html")
+	if err != nil {
+		log.Fatal(err)
+	}
+	indexHTML := strings.ReplaceAll(string(indexBytes), "__BUILD_VERSION__", buildVersion)
+	fileServer := http.FileServer(http.FS(staticFS))
+	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/" || r.URL.Path == "/index.html" {
+			w.Header().Set("Content-Type", "text/html; charset=utf-8")
+			w.Header().Set("Cache-Control", "no-cache, no-store, must-revalidate")
+			w.Header().Set("Pragma", "no-cache")
+			w.Header().Set("Expires", "0")
+			_, _ = w.Write([]byte(indexHTML))
+			return
+		}
+		fileServer.ServeHTTP(w, r)
+	})
 
 	port := os.Getenv("PORT")
 	if port == "" {
@@ -69,7 +86,7 @@ func securityHeaders(next http.Handler) http.Handler {
 		w.Header().Set("X-Content-Type-Options", "nosniff")
 		w.Header().Set("X-Frame-Options", "DENY")
 		w.Header().Set("Referrer-Policy", "same-origin")
-		if r.URL.Path == "/" || r.URL.Path == "/index.html" || r.URL.Path == "/app.js" || r.URL.Path == "/styles.css" {
+		if r.URL.Path == "/" || r.URL.Path == "/index.html" || r.URL.Path == "/app.js" || r.URL.Path == "/controls.js" || r.URL.Path == "/styles.css" {
 			w.Header().Set("Cache-Control", "no-cache, no-store, must-revalidate")
 			w.Header().Set("Pragma", "no-cache")
 			w.Header().Set("Expires", "0")
