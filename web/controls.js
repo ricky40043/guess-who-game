@@ -40,7 +40,7 @@
 
   function injectHostControls() {
     if (document.querySelector('#host-live-controls')) return
-    if (!state.isHost || !state.roomId || state.status === 'home' || state.status === 'waiting') return
+    if (!state.isHost || !state.roomId || state.status === 'home' || state.status === 'waiting' || state.status === 'revealing') return
 
     const card = document.querySelector('.card')
     if (!card) return
@@ -50,14 +50,12 @@
     controls.className = 'host-live-controls'
 
     if (state.status === 'answering') {
-      const skip = document.createElement('button')
-      skip.className = 'btn secondary'
-      skip.textContent = '換下一題'
-      skip.addEventListener('click', () => confirmAndSend('確定跳過本題？本題所有已作答內容都會清除，下一題重新完整倒數。', 'SKIP_QUESTION'))
-      controls.appendChild(skip)
-    }
+      const replace = document.createElement('button')
+      replace.className = 'btn secondary'
+      replace.textContent = '換掉這題'
+      replace.addEventListener('click', () => confirmAndSend('確定換掉目前題目？本題所有已作答內容會清除，題號不變並重新完整倒數。', 'SKIP_QUESTION'))
+      controls.appendChild(replace)
 
-    if (state.status === 'answering' || state.status === 'revealing') {
       const forceGuess = document.createElement('button')
       forceGuess.className = 'btn secondary'
       forceGuess.textContent = '直接進入猜人'

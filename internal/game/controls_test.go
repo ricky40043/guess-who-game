@@ -5,9 +5,17 @@ import (
 	"time"
 )
 
+func controlTestBank() []Question {
+	return []Question{
+		{ID: 1, Text: "第一題", Category: "測試"},
+		{ID: 2, Text: "第二題", Category: "測試"},
+		{ID: 3, Text: "替換題", Category: "測試"},
+	}
+}
+
 func newControlTestRoom(t *testing.T) (*Service, *Room) {
 	t.Helper()
-	service := NewService(testBank())
+	service := NewService(controlTestBank())
 	room := service.CreateRoom("host", Settings{
 		QuestionMode:  "custom",
 		QuestionIDs:   []int{1, 2},
@@ -25,7 +33,20 @@ func newControlTestRoom(t *testing.T) (*Service, *Room) {
 	return service, room
 }
 
-func TestSkipQuestionClearsAnswersAndRestartsCountdown(t *testing.T) {
+func TestRoomCodeIsFourDigits(t *testing.T) {
+	service := NewService(controlTestBank())
+	room := service.CreateRoom("host", DefaultSettings())
+	if len(room.ID) != 4 {
+		t.Fatalf("expected 4 digit room code, got %q", room.ID)
+	}
+	for _, character := range room.ID {
+		if character < '0' || character > '9' {
+			t.Fatalf("room code must contain digits only: %q", room.ID)
+		}
+	}
+}
+
+func TestSkipQuestionReplacesCurrentQuestionAndRestartsCountdown(t *testing.T) {
 	service, room := newControlTestRoom(t)
 	if _, _, err := service.SubmitAnswer(room.ID, "p1", 0, "已作答"); err != nil {
 		t.Fatal(err)
@@ -41,14 +62,17 @@ func TestSkipQuestionClearsAnswersAndRestartsCountdown(t *testing.T) {
 
 	room.Mu.Lock()
 	defer room.Mu.Unlock()
-	if room.CurrentIndex != 1 {
-		t.Fatalf("expected question index 1, got %d", room.CurrentIndex)
+	if room.CurrentIndex != 0 {
+		t.Fatalf("question index should stay at 0, got %d", room.CurrentIndex)
+	}
+	if room.Questions[0].ID != 3 {
+		t.Fatalf("current question was not replaced: %#v", room.Questions[0])
 	}
 	if len(room.Submitted) != 0 {
 		t.Fatalf("submitted state was not cleared: %#v", room.Submitted)
 	}
 	if _, exists := room.Answers["p1"][1]; exists {
-		t.Fatal("skipped question answer was not deleted")
+		t.Fatal("replaced question answer was not deleted")
 	}
 	remaining := room.AnswerDeadline.Sub(room.UpdatedAt)
 	if remaining < 59*time.Second || remaining > 61*time.Second {
