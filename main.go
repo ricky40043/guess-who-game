@@ -7,13 +7,15 @@ import (
 	"log"
 	"net/http"
 	"os"
-	"strings"
 	"time"
 
 	"github.com/ricky40043/guess-who-game/internal/game"
 	"github.com/ricky40043/guess-who-game/internal/questions"
 	"github.com/ricky40043/guess-who-game/internal/ws"
 )
+
+// buildVersion 由 Docker build 使用 -ldflags 注入 Git commit SHA。
+var buildVersion = "dev"
 
 //go:embed web/*
 var webFiles embed.FS
@@ -25,6 +27,9 @@ func main() {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/api/health", func(w http.ResponseWriter, _ *http.Request) {
 		writeJSON(w, http.StatusOK, map[string]any{"status": "ok", "time": time.Now().UnixMilli()})
+	})
+	mux.HandleFunc("/api/version", func(w http.ResponseWriter, _ *http.Request) {
+		writeJSON(w, http.StatusOK, map[string]any{"version": buildVersion})
 	})
 	mux.HandleFunc("/api/questions", func(w http.ResponseWriter, _ *http.Request) {
 		writeJSON(w, http.StatusOK, map[string]any{"questions": questions.Bank})
@@ -49,7 +54,7 @@ func main() {
 		ReadHeaderTimeout: 10 * time.Second,
 		IdleTimeout:       90 * time.Second,
 	}
-	log.Printf("Guess Who Game listening on http://localhost:%s", port)
+	log.Printf("Guess Who Game %s listening on http://localhost:%s", buildVersion, port)
 	log.Fatal(server.ListenAndServe())
 }
 
@@ -64,15 +69,11 @@ func securityHeaders(next http.Handler) http.Handler {
 		w.Header().Set("X-Content-Type-Options", "nosniff")
 		w.Header().Set("X-Frame-Options", "DENY")
 		w.Header().Set("Referrer-Policy", "same-origin")
-
-		// 前端檔案直接嵌入 Go 執行檔。每次部署後都要求瀏覽器重新驗證，
-		// 避免手機或 Cloudflare 繼續使用舊版 app.js 而看不到新功能。
-		if r.URL.Path == "/" || strings.HasSuffix(r.URL.Path, ".html") || strings.HasSuffix(r.URL.Path, ".js") || strings.HasSuffix(r.URL.Path, ".css") {
+		if r.URL.Path == "/" || r.URL.Path == "/index.html" || r.URL.Path == "/app.js" || r.URL.Path == "/styles.css" {
 			w.Header().Set("Cache-Control", "no-cache, no-store, must-revalidate")
 			w.Header().Set("Pragma", "no-cache")
 			w.Header().Set("Expires", "0")
 		}
-
 		next.ServeHTTP(w, r)
 	})
 }
