@@ -80,30 +80,30 @@ func TestSkipQuestionReplacesCurrentQuestionAndRestartsCountdown(t *testing.T) {
 	}
 }
 
-func TestForceStartGuessingAndFinishWhenAllSubmit(t *testing.T) {
+func TestForceStartGuessingActuallyStartsReveal(t *testing.T) {
 	service, room := newControlTestRoom(t)
+	if _, _, err := service.SubmitAnswer(room.ID, "p1", 0, "答案一"); err != nil {
+		t.Fatal(err)
+	}
+
 	event, err := service.ForceStartGuessing(room.ID)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if event.Type != "GUESSING_STARTED" {
-		t.Fatalf("expected GUESSING_STARTED, got %s", event.Type)
+	if event.Type != "REVEAL_STARTED" {
+		t.Fatalf("expected REVEAL_STARTED, got %s", event.Type)
 	}
 
 	room.Mu.Lock()
-	aliasP1 := room.AliasByPlayer["p1"]
-	aliasP2 := room.AliasByPlayer["p2"]
-	room.Mu.Unlock()
-
-	if _, finished, err := service.SubmitGuesses(room.ID, "p1", map[string]string{aliasP2: "p2"}); err != nil || finished != nil {
-		t.Fatalf("first guess submission failed or finished early: event=%v err=%v", finished, err)
+	defer room.Mu.Unlock()
+	if room.Status != StatusRevealing {
+		t.Fatalf("expected revealing status, got %s", room.Status)
 	}
-	_, finished, err := service.SubmitGuesses(room.ID, "p2", map[string]string{aliasP1: "p1"})
-	if err != nil {
-		t.Fatal(err)
+	if len(room.RevealOrder) != 2 {
+		t.Fatalf("expected 2 reveal profiles, got %d", len(room.RevealOrder))
 	}
-	if finished == nil || finished.Type != "GAME_FINISHED" {
-		t.Fatalf("expected GAME_FINISHED, got %#v", finished)
+	if room.RevealIndex != 0 {
+		t.Fatalf("expected reveal index 0, got %d", room.RevealIndex)
 	}
 }
 
