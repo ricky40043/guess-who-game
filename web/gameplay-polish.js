@@ -52,10 +52,23 @@
   }
 
   function injectRevealPanel() {
-    document.querySelector('#reveal-auto-panel')?.remove()
     const card = document.querySelector('.card')
     if (!card) return
     card.classList.add('reveal-stage-card')
+
+    const originalNext = document.querySelector('#next-reveal')
+    if (originalNext) originalNext.closest('.actions')?.classList.add('hidden')
+
+    // MutationObserver 會監看整個 app；若每次都刪除重建面板，會造成無限 DOM 迴圈。
+    // 面板已存在時保持原節點，只更新必要狀態。
+    const existing = document.querySelector('#reveal-auto-panel')
+    if (existing) {
+      const previous = existing.querySelector('[data-action="previous"]')
+      if (previous) previous.disabled = Number(state.reveal.revealNumber) <= 1
+      const next = existing.querySelector('[data-action="next"]')
+      if (next) next.textContent = state.reveal.isLast ? '完成公布' : '下一位 →'
+      return
+    }
 
     const panel = document.createElement('div')
     panel.id = 'reveal-auto-panel'
@@ -66,17 +79,18 @@
       const actions = document.createElement('div')
       actions.className = 'reveal-nav-actions'
 
-      const previous = button('← 上一位', 'btn secondary', () => showPrevious())
+      const previous = button('← 上一位', 'btn secondary', showPrevious)
+      previous.dataset.action = 'previous'
       previous.disabled = Number(state.reveal.revealNumber) <= 1
       actions.appendChild(previous)
       actions.appendChild(button('重新朗讀', 'btn secondary', startSpeech))
-      actions.appendChild(button(state.reveal.isLast ? '完成公布' : '下一位 →', 'btn large', nextReveal))
+      const next = button(state.reveal.isLast ? '完成公布' : '下一位 →', 'btn large', nextReveal)
+      next.dataset.action = 'next'
+      actions.appendChild(next)
       panel.appendChild(actions)
     }
 
     card.appendChild(panel)
-    const originalNext = document.querySelector('#next-reveal')
-    if (originalNext) originalNext.closest('.actions')?.classList.add('hidden')
   }
 
   function button(text, className, click) {
@@ -205,7 +219,15 @@
     } catch (_) {}
   }
 
-  const observer = new MutationObserver(() => queueMicrotask(enhance))
+  let enhanceQueued = false
+  const observer = new MutationObserver(() => {
+    if (enhanceQueued) return
+    enhanceQueued = true
+    queueMicrotask(() => {
+      enhanceQueued = false
+      enhance()
+    })
+  })
   observer.observe(document.querySelector('#app'), { childList: true, subtree: true })
   queueMicrotask(enhance)
 })()
