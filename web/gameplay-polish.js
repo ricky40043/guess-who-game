@@ -1,13 +1,19 @@
 (() => {
-  const original = handleMessage
+  const originalHandleMessage = handleMessage
+  const originalRender = render
   const history = new Map()
   let speechToken = 0
   let pauseTimer = null
   let beepSecond = -1
   let audioContext = null
 
+  render = function () {
+    originalRender()
+    enhance()
+  }
+
   handleMessage = function (message) {
-    original(message)
+    originalHandleMessage(message)
     const type = message?.type
     const data = message?.data || {}
 
@@ -22,6 +28,36 @@
       cancelSpeech()
     }
     queueMicrotask(enhance)
+  }
+
+  document.addEventListener('click', event => {
+    const startButton = event.target.closest('#start-game')
+    if (!startButton) return
+
+    event.preventDefault()
+    event.stopImmediatePropagation()
+
+    const settings = collectSettings()
+    send('UPDATE_SETTINGS', settings)
+    send('START_GAME')
+  }, true)
+
+  function collectSettings() {
+    const mode = document.querySelector('#question-mode')?.value || 'random'
+    const questionIds = [...document.querySelectorAll('.question-check:checked')].map(input => Number(input.value))
+    const customTexts = (document.querySelector('#custom-texts')?.value || '')
+      .split('\n')
+      .map(value => value.trim())
+      .filter(Boolean)
+
+    return {
+      questionCount: Number(document.querySelector('#question-count')?.value || 5),
+      answerSeconds: Number(document.querySelector('#answer-seconds')?.value || 60),
+      guessSeconds: Number(document.querySelector('#guess-seconds')?.value || 120),
+      questionMode: mode,
+      questionIds,
+      customTexts,
+    }
   }
 
   function enhance() {
@@ -39,7 +75,9 @@
     }
 
     const answeringCard = state.status === 'answering' ? document.querySelector('.card.center') : null
-    if (answeringCard) answeringCard.classList.add('answer-stage-card')
+    if (answeringCard && !answeringCard.classList.contains('answer-stage-card')) {
+      answeringCard.classList.add('answer-stage-card')
+    }
 
     if (state.status === 'revealing' && state.reveal?.profile) {
       injectRevealPanel()
@@ -54,19 +92,16 @@
   function injectRevealPanel() {
     const card = document.querySelector('.card')
     if (!card) return
-    card.classList.add('reveal-stage-card')
+    if (!card.classList.contains('reveal-stage-card')) card.classList.add('reveal-stage-card')
 
-    const originalNext = document.querySelector('#next-reveal')
-    if (originalNext) originalNext.closest('.actions')?.classList.add('hidden')
-
-    // MutationObserver 會監看整個 app；若每次都刪除重建面板，會造成無限 DOM 迴圈。
-    // 面板已存在時保持原節點，只更新必要狀態。
-    const existing = document.querySelector('#reveal-auto-panel')
-    if (existing) {
-      const previous = existing.querySelector('[data-action="previous"]')
-      if (previous) previous.disabled = Number(state.reveal.revealNumber) <= 1
-      const next = existing.querySelector('[data-action="next"]')
-      if (next) next.textContent = state.reveal.isLast ? '完成公布' : '下一位 →'
+    const existingPanel = document.querySelector('#reveal-auto-panel')
+    if (existingPanel) {
+      const previous = existingPanel.querySelector('[data-action="previous"]')
+      const next = existingPanel.querySelector('[data-action="next"]')
+      const shouldDisablePrevious = Number(state.reveal.revealNumber) <= 1
+      const nextText = state.reveal.isLast ? '完成公布' : '下一位 →'
+      if (previous && previous.disabled !== shouldDisablePrevious) previous.disabled = shouldDisablePrevious
+      if (next && next.textContent !== nextText) next.textContent = nextText
       return
     }
 
@@ -82,15 +117,20 @@
       const previous = button('← 上一位', 'btn secondary', showPrevious)
       previous.dataset.action = 'previous'
       previous.disabled = Number(state.reveal.revealNumber) <= 1
-      actions.appendChild(previous)
-      actions.appendChild(button('重新朗讀', 'btn secondary', startSpeech))
+
+      const replay = button('重新朗讀', 'btn secondary', startSpeech)
+      replay.dataset.action = 'replay'
+
       const next = button(state.reveal.isLast ? '完成公布' : '下一位 →', 'btn large', nextReveal)
       next.dataset.action = 'next'
-      actions.appendChild(next)
+
+      actions.append(previous, replay, next)
       panel.appendChild(actions)
     }
 
     card.appendChild(panel)
+    const originalNext = document.querySelector('#next-reveal')
+    if (originalNext) originalNext.closest('.actions')?.classList.add('hidden')
   }
 
   function button(text, className, click) {
@@ -110,10 +150,7 @@
     state.reveal = JSON.parse(JSON.stringify(previous))
     state.revealComplete = false
     render()
-    queueMicrotask(() => {
-      enhance()
-      startSpeech()
-    })
+    startSpeech()
   }
 
   function nextReveal() {
@@ -131,7 +168,8 @@
     const items = Array.isArray(profile.answers) ? profile.answers : []
 
     if (!window.speechSynthesis || !window.SpeechSynthesisUtterance) {
-      return pauseAfterSpeech(token)
+      pauseAfterSpeech(token)
+      return
     }
 
     speakText(token, profile.alias, () => speakAnswerItem(token, items, 0))
@@ -175,7 +213,10 @@
     let remaining = 5
     setStatus(`朗讀完成，${remaining} 秒後${state.reveal.isLast ? '完成公布' : '下一位'}`)
     pauseTimer = window.setInterval(() => {
-      if (token !== speechToken) return cancelSpeech()
+      if (token !== speechToken) {
+        cancelSpeech()
+        return
+      }
       remaining -= 1
       if (remaining <= 0) {
         window.clearInterval(pauseTimer)
@@ -189,7 +230,7 @@
 
   function setStatus(text) {
     const status = document.querySelector('#reveal-auto-status')
-    if (status) status.textContent = text
+    if (status && status.textContent !== text) status.textContent = text
   }
 
   function cancelSpeech() {
@@ -219,15 +260,5 @@
     } catch (_) {}
   }
 
-  let enhanceQueued = false
-  const observer = new MutationObserver(() => {
-    if (enhanceQueued) return
-    enhanceQueued = true
-    queueMicrotask(() => {
-      enhanceQueued = false
-      enhance()
-    })
-  })
-  observer.observe(document.querySelector('#app'), { childList: true, subtree: true })
-  queueMicrotask(enhance)
+  enhance()
 })()
