@@ -39,6 +39,23 @@ var Bank = []game.Question{
 	{ID: 34, Text: "曾經用過最尷尬的告白方式是什麼？", Category: "感情與尷尬往事"},
 	{ID: 35, Text: "曾經為了喜歡的人做過什麼傻事？", Category: "感情與尷尬往事"},
 	{ID: 36, Text: "最後一次尿床大約是幾歲？", Category: "感情與尷尬往事"},
+	{ID: 37, Text: "成為你朋友的三個必要條件是什麼？", Category: "朋友與感情"},
+	{ID: 38, Text: "喜歡的人的三個必要外表特徵是什麼？", Category: "朋友與感情"},
+	{ID: 39, Text: "喜歡的人的三個必要個性條件是什麼？", Category: "朋友與感情"},
+	{ID: 40, Text: "最不能接受朋友有哪一種習慣？", Category: "朋友與感情"},
+	{ID: 41, Text: "第一次見面最先注意對方哪裡？", Category: "朋友與感情"},
+	{ID: 42, Text: "最容易讓你對一個人瞬間扣分的行為是什麼？", Category: "朋友與感情"},
+	{ID: 43, Text: "最容易讓你對一個人瞬間加分的行為是什麼？", Category: "朋友與感情"},
+	{ID: 44, Text: "朋友找你出去，最常用什麼理由拒絕？", Category: "朋友與感情"},
+	{ID: 45, Text: "早餐最常選蛋餅、吐司、飯糰，還是麵？", Category: "飲食習慣"},
+	{ID: 46, Text: "最常把哪一樣東西忘在家裡？", Category: "生活習慣"},
+	{ID: 47, Text: "手機剩幾％電時會開始焦慮？", Category: "生活習慣"},
+	{ID: 48, Text: "鬧鐘響後通常會按幾次貪睡？", Category: "生活習慣"},
+	{ID: 49, Text: "最長曾經多久沒有洗頭？", Category: "生活習慣"},
+	{ID: 50, Text: "小時候最常偷吃什麼東西？", Category: "童年回憶"},
+	{ID: 51, Text: "小時候最捨不得丟掉的玩具是什麼？", Category: "童年回憶"},
+	{ID: 52, Text: "曾經剪過最後悔的髮型是什麼？", Category: "尷尬趣事"},
+	{ID: 53, Text: "最喜歡的一部電視劇或動漫是什麼？", Category: "娛樂喜好"},
 }
 
 func MapByID() map[int]game.Question {
